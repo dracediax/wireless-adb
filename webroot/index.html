@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireless ADB</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #1a1a2e; color: #e0e0e0;
+    padding: 16px; min-height: 100vh;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; color: #fff; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+
+  .card {
+    background: #16213e; border-radius: 12px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .card h2 {
+    font-size: 14px; color: #8899bb; margin-bottom: 12px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  .status-display {
+    text-align: center; padding: 20px 0;
+  }
+  .status-dot {
+    display: inline-block; width: 12px; height: 12px;
+    border-radius: 50%; margin-right: 8px; vertical-align: middle;
+  }
+  .status-dot.on { background: #3fb950; box-shadow: 0 0 8px #3fb95066; }
+  .status-dot.off { background: #666; }
+  .status-text {
+    font-size: 18px; font-weight: 600; color: #fff;
+  }
+  .connect-info {
+    margin-top: 12px; background: #0f1a30; border-radius: 8px;
+    padding: 14px; text-align: center; font-family: monospace;
+    font-size: 16px; color: #58a6ff; letter-spacing: 0.5px;
+    user-select: all; cursor: pointer;
+  }
+  .connect-hint {
+    font-size: 11px; color: #666; margin-top: 6px; text-align: center;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 0;
+  }
+  .toggle-label { font-size: 15px; color: #ccc; }
+  .toggle { position: relative; width: 52px; height: 28px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider {
+    position: absolute; inset: 0; background: #333;
+    border-radius: 28px; cursor: pointer; transition: 0.3s;
+  }
+  .toggle .slider:before {
+    content: ""; position: absolute;
+    height: 22px; width: 22px; left: 3px; bottom: 3px;
+    background: #888; border-radius: 50%; transition: 0.3s;
+  }
+  .toggle input:checked + .slider { background: #3fb950; }
+  .toggle input:checked + .slider:before { transform: translateX(24px); background: #fff; }
+
+  .port-row {
+    display: flex; align-items: center; gap: 10px; margin-top: 12px;
+  }
+  .port-row label {
+    font-size: 13px; color: #888;
+  }
+  .port-row input {
+    width: 100px; background: #0f1a30; border: 1px solid #334;
+    border-radius: 8px; padding: 8px 10px; color: #fff;
+    font-size: 15px; font-weight: 600; outline: none;
+    text-align: center; font-family: monospace;
+  }
+  .port-row input:focus { border-color: #5577bb; }
+
+  .btn {
+    width: 100%; padding: 14px; color: #fff;
+    border: none; border-radius: 12px; font-size: 15px;
+    font-weight: 500; cursor: pointer; margin-top: 8px;
+  }
+  .btn-save { background: #4466aa; }
+  .btn-save:active { background: #335588; }
+  .btn-apply { background: #2a6a2a; }
+  .btn-apply:active { background: #1a5a1a; }
+
+  .status-msg {
+    text-align: center; font-size: 13px;
+    color: #888; margin-top: 12px; min-height: 20px;
+  }
+
+  .info {
+    font-size: 12px; color: #666; line-height: 1.6; margin-top: 8px;
+  }
+
+  .warn-card {
+    background: #2a2a1a; border: 1px solid #554422; border-radius: 12px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .warn-card h2 { color: #d29922; }
+  .warn-card .info { color: #aa8844; }
+
+  .settings-toggle {
+    width: 100%; padding: 14px; background: #1a2a4a; color: #ccd;
+    border: 1px solid #334477; border-radius: 12px; font-size: 15px;
+    font-weight: 600; cursor: pointer; margin-top: 16px; text-align: center;
+  }
+  .settings-toggle:active { background: #16213e; }
+  .settings-panel {
+    display: none; background: #16213e; border: 1px solid #334477;
+    border-top: none; border-radius: 0 0 12px 12px; padding: 16px;
+    margin-top: -4px;
+  }
+  .settings-panel.open { display: block; }
+  .setting-group { margin-bottom: 16px; }
+  .setting-group:last-child { margin-bottom: 0; }
+  .setting-group h3 {
+    font-size: 13px; color: #8899bb; margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .setting-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  .setting-row input[type="checkbox"] {
+    width: 18px; height: 18px; accent-color: #4466aa;
+  }
+  .setting-row label { font-size: 13px; color: #ccc; cursor: pointer; }
+  .setting-info { font-size: 12px; color: #888; line-height: 1.6; }
+  .setting-warn { font-size: 11px; color: #888; margin-top: 8px; }
+
+  .dbg-section {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+    margin: 10px 0; padding: 12px; font-family: monospace;
+    font-size: 13px; line-height: 1.6; color: #c9d1d9;
+    word-break: break-all; white-space: pre-wrap;
+  }
+  .dbg-section h3 {
+    font-size: 13px; color: #58a6ff; margin: 0 0 8px 0;
+    padding-bottom: 6px; border-bottom: 1px solid #21262d;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  .dbg-ok { color: #3fb950; }
+  .dbg-warn { color: #d29922; }
+  .dbg-dim { color: #6e7681; }
+  .dbg-key { color: #79c0ff; }
+</style>
+</head>
+<body>
+
+<h1>Wireless ADB</h1>
+<p class="subtitle">Persistent wireless debugging — auto-enables on boot</p>
+
+<div class="card">
+  <h2>Status</h2>
+  <div class="status-display">
+    <span class="status-dot" id="status-dot"></span>
+    <span class="status-text" id="status-text">Checking...</span>
+  </div>
+  <div class="connect-info" id="connect-info" style="display:none" onclick="copyConnect()">
+    <span id="connect-addr">-</span>
+  </div>
+  <div class="connect-hint" id="connect-hint" style="display:none">Tap to copy. Connect with: adb connect &lt;address&gt;</div>
+</div>
+
+<div class="card">
+  <div class="toggle-row">
+    <span class="toggle-label">Enable on boot</span>
+    <label class="toggle">
+      <input type="checkbox" id="enabled-toggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="port-row">
+    <label>Port:</label>
+    <input type="number" id="port-input" value="5555" min="1024" max="65535">
+  </div>
+</div>
+
+<div class="warn-card">
+  <h2>Security</h2>
+  <div class="info">
+    Wireless ADB gives full device access to anyone who can connect. Only use on trusted networks. Never enable on public WiFi.
+  </div>
+</div>
+
+<button class="btn btn-save" onclick="saveConfig()">Save Configuration</button>
+<button class="btn btn-apply" onclick="applyNow()">Apply Now (No Reboot)</button>
+
+<button class="settings-toggle" onclick="toggleSettings()">Settings</button>
+<div class="settings-panel" id="settings-panel">
+  <div class="setting-group">
+    <h3>Advanced</h3>
+    <div class="setting-row">
+      <input type="checkbox" id="debug-toggle">
+      <label for="debug-toggle">Enable debug menu</label>
+    </div>
+  </div>
+  <div class="setting-warn">
+    Press <b>Save Configuration</b> to apply settings changes.
+  </div>
+</div>
+
+<button class="btn" id="debug-btn" style="display:none;background:#333;margin-top:8px;font-size:13px" onclick="showDebug()">Show Debug Info</button>
+<p class="status-msg" id="status-msg"></p>
+<div id="debug-out" style="display:none"></div>
+
+<script>
+var CONFIG_PATH = '/data/adb/wadb_config';
+var LOGFILE = '/data/adb/modules/wireless-adb/debug.log';
+
+function exec(cmd) {
+  var apis = [
+    { name: 'ksu', obj: typeof ksu !== 'undefined' ? ksu : null },
+    { name: 'ksuwebui', obj: typeof ksuwebui !== 'undefined' ? ksuwebui : null }
+  ];
+  for (var a = 0; a < apis.length; a++) {
+    if (!apis[a].obj) continue;
+    try {
+      var r = apis[a].obj.exec(cmd);
+      if (typeof r === 'string') return r;
+      if (typeof r === 'object' && r !== null) return r.stdout || r.out || '';
+      return String(r);
+    } catch(e) {}
+  }
+  return '';
+}
+
+function loadConfig() {
+  var config = exec("cat " + CONFIG_PATH + " 2>/dev/null").trim();
+  if (config) {
+    var enabledMatch = config.match(/enabled=(\w+)/);
+    var portMatch = config.match(/port=(\d+)/);
+    if (enabledMatch) document.getElementById('enabled-toggle').checked = (enabledMatch[1] === 'on');
+    if (portMatch) document.getElementById('port-input').value = portMatch[1];
+  }
+
+  // Load debug toggle
+  var debugMatch = config.match(/debug_menu=(\w+)/);
+  if (debugMatch && debugMatch[1] === 'on') {
+    document.getElementById('debug-toggle').checked = true;
+    document.getElementById('debug-btn').style.display = 'block';
+  }
+
+  updateStatus();
+}
+
+function updateStatus() {
+  var tcpPort = exec("getprop service.adb.tcp.port").trim();
+  var ip = exec("ip route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | cut -d' ' -f2").trim();
+  var dot = document.getElementById('status-dot');
+  var text = document.getElementById('status-text');
+  var info = document.getElementById('connect-info');
+  var hint = document.getElementById('connect-hint');
+  var addr = document.getElementById('connect-addr');
+
+  if (tcpPort && tcpPort !== '-1' && tcpPort !== '0' && ip) {
+    dot.className = 'status-dot on';
+    text.textContent = 'Active on port ' + tcpPort;
+    addr.textContent = 'adb connect ' + ip + ':' + tcpPort;
+    info.style.display = 'block';
+    hint.style.display = 'block';
+  } else if (tcpPort && tcpPort !== '-1' && tcpPort !== '0') {
+    dot.className = 'status-dot on';
+    text.textContent = 'Active on port ' + tcpPort;
+    addr.textContent = 'No WiFi connection';
+    info.style.display = 'block';
+    hint.style.display = 'none';
+  } else {
+    dot.className = 'status-dot off';
+    text.textContent = 'Disabled';
+    info.style.display = 'none';
+    hint.style.display = 'none';
+  }
+}
+
+function copyConnect() {
+  var text = document.getElementById('connect-addr').textContent;
+  if (text && text.indexOf('adb') !== -1) {
+    exec("echo '" + text + "' | am broadcast -a clipper.set 2>/dev/null");
+    document.getElementById('status-msg').textContent = 'Copied to clipboard';
+    setTimeout(function() { document.getElementById('status-msg').textContent = ''; }, 2000);
+  }
+}
+
+function saveConfig() {
+  var enabled = document.getElementById('enabled-toggle').checked ? 'on' : 'off';
+  var port = document.getElementById('port-input').value.trim() || '5555';
+  var debugOn = document.getElementById('debug-toggle').checked;
+
+  document.getElementById('debug-btn').style.display = debugOn ? 'block' : 'none';
+  if (!debugOn) document.getElementById('debug-out').style.display = 'none';
+
+  exec("echo 'enabled=" + enabled + "\\nport=" + port + "\\ndebug_menu=" + (debugOn ? 'on' : 'off') + "' > " + CONFIG_PATH);
+  document.getElementById('status-msg').textContent = 'Configuration saved. Reboot to apply.';
+}
+
+function applyNow() {
+  var enabled = document.getElementById('enabled-toggle').checked;
+  var port = document.getElementById('port-input').value.trim() || '5555';
+
+  // Save config first
+  saveConfig();
+
+  if (enabled) {
+    exec("setprop service.adb.tcp.port " + port + " && stop adbd && start adbd");
+    document.getElementById('status-msg').textContent = 'Wireless ADB enabled on port ' + port;
+  } else {
+    exec("setprop service.adb.tcp.port -1 && stop adbd && start adbd");
+    document.getElementById('status-msg').textContent = 'Wireless ADB disabled';
+  }
+
+  // Refresh status after a moment
+  setTimeout(updateStatus, 1000);
+}
+
+function toggleSettings() {
+  var panel = document.getElementById('settings-panel');
+  panel.className = panel.className.indexOf('open') !== -1 ? 'settings-panel' : 'settings-panel open';
+}
+
+function showDebug() {
+  var el = document.getElementById('debug-out');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'none') return;
+
+  var html = '';
+
+  var s1 = '';
+  var tcpPort = exec("getprop service.adb.tcp.port").trim() || '(not set)';
+  var tlsPort = exec("getprop service.adb.tls.port").trim() || '(not set)';
+  var adbEnabled = exec("settings get global adb_wifi_enabled 2>/dev/null").trim() || '(not set)';
+  var ip = exec("ip route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | cut -d' ' -f2").trim() || '(no wifi)';
+  var usbDebug = exec("settings get global adb_enabled 2>/dev/null").trim() || '?';
+  s1 += '<span class="dbg-key">service.adb.tcp.port</span>  <span class="' + (tcpPort !== '-1' && tcpPort !== '(not set)' ? 'dbg-ok' : 'dbg-dim') + '">' + tcpPort + '</span>\n';
+  s1 += '<span class="dbg-key">service.adb.tls.port</span>  <span class="dbg-dim">' + tlsPort + '</span>\n';
+  s1 += '<span class="dbg-key">adb_wifi_enabled</span>  <span class="dbg-dim">' + adbEnabled + '</span>\n';
+  s1 += '<span class="dbg-key">adb_enabled (USB)</span>  <span class="dbg-dim">' + usbDebug + '</span>\n';
+  s1 += '<span class="dbg-key">device IP</span>  <span class="dbg-ok">' + ip + '</span>\n';
+  html += '<div class="dbg-section"><h3>ADB PROPERTIES</h3>' + s1 + '</div>';
+
+  var s2 = '';
+  var config = exec("cat " + CONFIG_PATH + " 2>/dev/null").trim() || '(not set)';
+  var bootLog = exec("cat " + LOGFILE + " 2>/dev/null | tr '\\n' ' '").trim() || '(no log)';
+  s2 += '<span class="dbg-key">config</span>  ' + config.replace(/\n/g, ', ') + '\n';
+  s2 += '<span class="dbg-key">boot log</span>  ' + bootLog + '\n';
+  html += '<div class="dbg-section"><h3>CONFIG</h3>' + s2 + '</div>';
+
+  el.innerHTML = '<div style="margin-top:12px"><div style="text-align:center;color:#58a6ff;font-size:14px;font-weight:600;margin-bottom:8px">v1.0</div>' + html + '</div>';
+
+  // Write debug to file
+  exec("echo '=== Wireless ADB Debug ===\\nDate: " + new Date().toString() + "\\ntcp_port=" + tcpPort + "\\ntls_port=" + tlsPort + "\\nadb_wifi=" + adbEnabled + "\\nip=" + ip + "\\nconfig=" + config.replace(/\n/g, ',') + "' > " + LOGFILE);
+}
+
+loadConfig();
+</script>
+</body>
+</html>
