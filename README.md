@@ -1,6 +1,6 @@
 # Wireless ADB
 
-> Persistent wireless ADB debugging — auto-enables on boot, no setup needed every time.
+> Persistent wireless ADB debugging — auto-enables on boot, connect forever.
 
 ![KernelSU](https://img.shields.io/badge/KernelSU-Module-green?style=flat-square)
 ![Magisk](https://img.shields.io/badge/Magisk-Compatible-blue?style=flat-square)
@@ -12,11 +12,15 @@
 
 ## The Problem
 
-Wireless ADB resets after every reboot. You have to re-enable it, find the port, and reconnect from your computer each time.
+Wireless ADB resets after every reboot. You have to re-enable it, find the port, and reconnect each time.
 
 ## The Fix
 
-This module automatically enables wireless ADB on a fixed port after every boot. Flash it once, connect forever.
+Flash once. After every boot, wireless ADB is ready on a fixed port. Just connect.
+
+```
+adb connect <phone-ip>:5555
+```
 
 ---
 
@@ -25,36 +29,42 @@ This module automatically enables wireless ADB on a fixed port after every boot.
 1. Download the latest `.zip` from [Releases](https://github.com/dracediax/wireless-adb/releases)
 2. Flash via your module manager
 3. Reboot
-4. Connect from your computer:
-   ```
-   adb connect <phone-ip>:5555
-   ```
-5. That's it. It will auto-enable on every boot.
+4. You'll get a notification with the connection address
+5. From your computer: `adb connect <ip>:5555`
 
 ---
 
 ## WebUI
 
-- **Status indicator** — green dot when active, shows connection address
-- **Tap to copy** — tap the connection address to copy it
-- **Enable/disable toggle** — turn boot auto-enable on or off
-- **Custom port** — change from default 5555
-- **Apply Now** — enable/disable immediately without rebooting
-- **Boot notification** — get notified with the connection address after reboot
+- **Live status** — green dot when active, grey when disabled
+- **Connection address** — tap to copy `adb connect <ip>:<port>`
+- **Enable/disable toggle** — control whether it starts on boot
+- **Custom port** — default 5555, set whatever you want
+- **Apply Now** — enable or disable immediately, no reboot needed
 
 ---
 
-## Security
+<details>
+<summary><b>Battery Impact</b></summary>
+
+**None.** The module runs a single script at boot that takes ~1 second, then exits. No background process, no polling, no wake locks.
+
+The ADB daemon (`adbd`) is already running on any phone with USB debugging enabled. This module just tells it to also listen on TCP — zero additional battery cost.
+
+</details>
+
+<details>
+<summary><b>Security</b></summary>
 
 **Wireless ADB gives full device access to anyone who can connect.**
 
 - Only use on **trusted, private networks** (home WiFi behind a firewall)
 - **Never** enable on public WiFi, coffee shops, hotels, or guest networks
 - **Never** expose the port via port forwarding
-- Anyone on the same network who knows your IP can connect if they have an authorized ADB key
-- Consider disabling when not actively debugging
+- Connections still require an authorized ADB key (RSA fingerprint prompt)
+- Consider disabling via the WebUI toggle when not actively debugging
 
----
+</details>
 
 <details>
 <summary><b>How It Works</b></summary>
@@ -66,14 +76,9 @@ stop adbd
 start adbd
 ```
 
-This enables the ADB daemon in TCP mode on port 5555 (or your custom port). The config is read from `/data/adb/wadb_config` which persists across module updates.
+This switches the ADB daemon to TCP mode on your configured port. The phone's WiFi IP is auto-detected and shown in the notification and WebUI.
 
-### Data Files
-
-| File | Purpose |
-|------|---------|
-| `/data/adb/wadb_config` | Settings: enabled, port, debug toggle |
-| `debug.log` | Boot log and debug info (in module dir) |
+Config is stored at `/data/adb/wadb_config` and persists across module updates.
 
 ### Debug via ADB
 
@@ -93,6 +98,8 @@ adb shell "su -c 'cat /data/adb/modules/wireless-adb/debug.log'"
 | Magisk | Yes |
 | APatch | Yes |
 | KsuWebUI (standalone) | Yes |
+
+WebUI requires a manager with WebUI support or [KsuWebUI](https://github.com/adivenxnataly/KsuWebUI).
 
 ---
 
